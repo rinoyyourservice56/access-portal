@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cyber Health Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body {
+  font-family:'Montserrat',sans-serif;
+  margin:0;
+  min-height:100vh;
+  color:#e6e6e6;
+  background:linear-gradient(135deg,#050b14,#0a1220);
+  display:flex;
+  justify-content:center;
+}
+
+.page {
+  width:100%;
+  max-width:1100px;
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+
+h1 { color:#00ffff; }
+
+.container {
+  display:flex;
+  flex-wrap:wrap;
+  gap:20px;
+  justify-content:center;
+  width:100%;
+}
+
+.card {
+  background:rgba(10,20,35,0.8);
+  border-radius:20px;
+  padding:20px;
+  max-width:350px;
+  width:100%;
+  border:1px solid #00ffff44;
+  text-align:center;
+}
+
+.card.full { max-width:900px; width:100%; }
+
+label { display:block; margin-top:10px; text-align:left; }
+
+input, select {
+  width:100%;
+  padding:8px;
+  border-radius:10px;
+  background:#050b14;
+  color:#00ffff;
+  border:1px solid #00ffff44;
+}
+
+button {
+  margin-top:10px;
+  width:100%;
+  padding:10px;
+  border-radius:20px;
+  background:transparent;
+  border:1px solid #00ffff;
+  color:#00ffff;
+  cursor:pointer;
+}
+
+.undo {
+  border-color:#ff4d4d;
+  color:#ff4d4d;
+}
+
+canvas { margin-top:20px; }
+</style>
+</head>
+
+<body>
+<div class="page">
+
+<h1>CYBER HEALTH TRACKER</h1>
+
+<div class="card full">
+  <h2>Student Motivation</h2>
+  <p id="adviceText">Start logging your habits 🌱</p>
+  <button onclick="showMotivation()">Motivation</button>
+</div>
+
+<div class="container">
+
+  <!-- SLEEP -->
+  <div class="card">
+    <h2>Sleep</h2>
+    <label>Hours Slept</label>
+    <input type="number" id="sleepHours" step="0.5">
+    <button onclick="addSleep()">Log Sleep</button>
+    <button class="undo" onclick="undoSleep()">Undo Last Sleep</button>
+  </div>
+
+  <!-- EXERCISE -->
+  <div class="card">
+    <h2>Exercise</h2>
+    <label>Exercise Type</label>
+    <input id="exerciseType" placeholder="Type">
+    <label>Duration (minutes)</label>
+    <input type="number" id="exerciseDuration">
+    <button onclick="addExercise()">Log Exercise</button>
+    <button class="undo" onclick="undoExercise()">Undo Last Exercise</button>
+  </div>
+
+</div>
+
+<!-- 📊 WEEKLY AND DAILY DASHBOARD -->
+<div class="card full">
+  <h2>Weekly and Daily Progress</h2>
+  <canvas id="weeklySleepChart"></canvas>
+  <canvas id="dailySleepChart"></canvas>
+  <canvas id="dailyExerciseChart"></canvas>
+</div>
+
+</div>
+
+<script>
+const el = id => document.getElementById(id);
+
+/* ===== NOTIFICATION SETUP ===== */
+function requestNotificationPermission() {
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+}
+
+function notify(title, message) {
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "granted") {
+    new Notification(title, {
+      body: message,
+      icon: "https://cdn-icons-png.flaticon.com/512/3063/3063822.png"
+    });
+  }
+}
+
+requestNotificationPermission();
+
+/* ===== DATA ===== */
+let sleepData = JSON.parse(localStorage.getItem("sleepData")) || [];
+let exerciseData = JSON.parse(localStorage.getItem("exerciseData")) || [];
+
+/* ===== MOTIVATION ===== */
+const motivation = [
+  // GENERAL
+  "📚 Small progress every day beats last-minute stress.",
+  "🧠 Discipline now = freedom later.",
+  "🚀 Effort compounds over time.",
+  "🎯 Focus on consistency, not perfection.",
+  // SLEEP
+  "🛌 Good sleep fuels sharper thinking.",
+  "🌙 Nightly routines boost tomorrow’s performance.",
+  "💤 Rest is productive too — recharge wisely.",
+  "⚠️ Sleep is the foundation of focus.",
+  "🌿 Deep sleep grows brain power.",
+  "💡 A consistent bedtime improves memory.",
+  "🌄 Early mornings are easier with good sleep.",
+  "💤 Quality rest beats extra hours of cramming.",
+  "🛏️ Prioritize sleep to maximize energy.",
+  "✨ Dream big, but sleep first.",
+  // EXERCISE
+  "💪 Exercise is medicine for the brain.",
+  "🏃‍♂️ Movement sparks creativity.",
+  "🏋️‍♀️ Physical strength strengthens mental strength.",
+  "🚴‍♂️ Movement + mindfulness = unstoppable focus.",
+  "🔥 Stay active — energy follows action.",
+  "⚡ One workout fuels all-day focus.",
+  "💦 Hydration + movement = sharper mind.",
+  "🏅 Reward yourself with a healthy routine.",
+  "🌀 Exercise clears mental clutter.",
+  "🌟 Small workouts stack into big gains.",
+  // STUDY / PRODUCTIVITY
+  "📖 Reading expands both mind and imagination.",
+  "🎯 Goals without action remain dreams.",
+  "📅 Plan your day, then dominate it.",
+  "📊 Track progress to celebrate wins.",
+  "💭 Reflection turns mistakes into lessons.",
+  "📌 Tiny habits stack into life-changing routines.",
+  "🌐 Learn something new every day.",
+  "🎨 Creativity blooms from a clear mind.",
+  "💡 Ideas need action to become reality.",
+  "🗝️ The key to success is starting before ready.",
+  // MENTAL WELLNESS / MOTIVATION
+  "🌱 Growth is invisible until you look back.",
+  "💌 Self-kindness fuels persistence.",
+  "🌟 Focus on growth, not comparison.",
+  "⛰️ Challenges build character, embrace them.",
+  "⚡ Energy follows intention, not luck.",
+  "💻 Use tech mindfully, don’t get lost in it.",
+  "🛡️ Protect your focus — guard your time.",
+  "🧘 Mindfulness trains your brain for clarity.",
+  "🔗 Connect with others to stay motivated.",
+  "💥 Don’t wait for perfect conditions — start now.",
+  "🎯 One focused hour beats many distracted ones.",
+  "🌱 Consistency beats intensity over time.",
+  "📚 Knowledge is an investment that compounds.",
+  "🔥 Stay curious — curiosity sparks growth.",
+  "🛠️ Build routines that serve your goals.",
+  "🏆 Celebrate progress, no matter how small.",
+  "⏰ Prioritize what matters, eliminate distractions.",
+  "🧩 Small steps today prevent regret tomorrow.",
+  "💡 Your habits shape your future, choose wisely.",
+  "🖤 Self-discipline is your secret superpower.",
+  "🌊 Flow comes from preparation and practice.",
+  "💫 Your effort compounds faster than you think.",
+  "🔄 Review, adjust, and improve constantly.",
+  "💌 Encourage yourself daily — you deserve it.",
+  "🌈 Positive thoughts improve your day.",
+  "🏋️ Small wins create unstoppable habits.",
+  "💥 Effort today reduces stress tomorrow.",
+  "🌿 Mindset + action = unstoppable growth.",
+  "💪 Momentum beats motivation every time.",
+  "✨ Good habits today are success tomorrow.",
+  "🌟 Small improvements are better than none."
+];
+
+/* ===== SHOW MOTIVATION ===== */
+function showMotivation(){
+  el("adviceText").textContent =
+    motivation[Math.floor(Math.random()*motivation.length)];
+}
+
+/* ===== ADD LOGS ===== */
+function addSleep(){
+  const hours = +el("sleepHours").value;
+  if(!hours) return alert("Enter sleep hours");
+
+  let quality;
+  if (hours >= 8) {
+    quality = "Excellent";
+  } else if (hours >= 6) {
+    quality = "Good";
+  } else if (hours >= 4) {
+    quality = "Fair";
+  } else {
+    quality = "Poor";
+  }
+
+  sleepData.push({
+    hours,
+    quality,
+    date:new Date().toISOString()
+  });
+
+  localStorage.setItem("sleepData",JSON.stringify(sleepData));
+
+  if (quality === "Poor") {
+    el("adviceText").textContent = "⚠️ Poor sleep detected — try earlier bedtime & less screen time.";
+    notify("⚠️ Poor Sleep Detected", "Try an earlier bedtime and reduce screen time tonight.");
+  } else if (quality === "Excellent") {
+    el("adviceText").textContent = "🌟 Excellent sleep! You're crushing it with rest.";
+    notify("🌟 Excellent Sleep Logged", `You slept ${hours} hours. Amazing job!`);
+  } else {
+    el("adviceText").textContent = "✨ Good sleep! This improves memory and focus.";
+    notify("✨ Sleep Logged", `You slept ${hours} hours (${quality}). Keep it up!`);
+  }
+
+  el("sleepHours").value="";
+  updateCharts();
+}
+
+/* ===== ADD EXERCISE WITH ADVICE ===== */
+function addExercise(){
+  const duration = +el("exerciseDuration").value;
+  if(!duration) return alert("Enter duration");
+
+  const type = el("exerciseType").value || "Exercise";
+
+  exerciseData.push({
+    duration,
+    type,
+    date:new Date().toISOString()
+  });
+
+  localStorage.setItem("exerciseData",JSON.stringify(exerciseData));
+
+  el("exerciseDuration").value="";
+  el("exerciseType").value="";
+
+  // ✅ Exercise advice based on duration
+  let advice = "";
+  if (duration < 15) {
+    advice = "⚠️ You should aim for more activity to stay healthy 💪";
+  } else if (duration <= 45) {
+    advice = "✨ Nice! You're keeping active and consistent ✨";
+  } else {
+    advice = "🚀 Amazing! You're crushing your workout goals!";
+  }
+
+  el("adviceText").textContent = advice;
+
+  notify("💪 Exercise Logged", `${type} for ${duration} minutes. ${advice}`);
+
+  updateCharts();
+}
+
+/* ===== UNDO ===== */
+function undoSleep(){
+  if(!sleepData.length) return el("adviceText").textContent="No sleep data to remove.";
+  const removed = sleepData.pop();
+  localStorage.setItem("sleepData",JSON.stringify(sleepData));
+  el("adviceText").textContent="🗑 Last sleep entry removed.";
+  notify("🗑 Sleep Entry Removed", `Removed ${removed.hours} hours of ${removed.quality} sleep.`);
+  updateCharts();
+}
+
+function undoExercise(){
+  if(!exerciseData.length) return el("adviceText").textContent="No exercise data to remove.";
+  const removed = exerciseData.pop();
+  localStorage.setItem("exerciseData",JSON.stringify(exerciseData));
+  el("adviceText").textContent="🗑 Last exercise entry removed.";
+  notify("🗑 Exercise Entry Removed", `Removed ${removed.duration} min of ${removed.type}.`);
+  updateCharts();
+}
+
+/* ===== UTILITY FUNCTIONS ===== */
+function getWeek(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return weekNo;
+}
+
+/* ===== WEEKLY AND DAILY TOTALS ===== */
+function weeklyTotals(data, key, weeksBack = 4) {
+  const now = new Date();
+  const currentWeek = getWeek(now);
+  const totals = Array(weeksBack).fill(0);
+  data.forEach(item => {
+    const d = new Date(item.date);
+    const week = getWeek(d);
+    const diff = currentWeek - week;
+    if (diff >= 0 && diff < weeksBack) {
+      totals[weeksBack - 1 - diff] += item[key];
+    }
+  });
+  return totals;
+}
+
+function dailyTotals(data, key) {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const currentDay = now.getDate();
+  const daysRemaining = lastDayOfMonth - currentDay + 1; // +1 to include today
+  const totals = Array(daysRemaining).fill(0);
+  const labels = Array.from({length: daysRemaining}, (_, i) => `Day ${i + 1}`);
+  for (let i = 0; i < daysRemaining; i++) {
+    const date = new Date(now);
+    date.setDate(date.getDate() + i); // i=0: today, i=1: tomorrow, etc.
+    const dateStr = date.toDateString();
+    data.forEach(item => {
+      const itemDate = new Date(item.date).toDateString();
+      if (itemDate === dateStr) {
+        totals[i] += item[key];
+      }
+    });
+  }
+  return { totals, labels };
+}
+
+let weeklySleepChart, dailySleepChart, dailyExerciseChart;
+
+function updateCharts(){
+  weeklySleepChart?.destroy();
+  dailySleepChart?.destroy();
+  dailyExerciseChart?.destroy();
+
+  const weeklySleep = weeklyTotals(sleepData, "hours");
+  const dailySleep = dailyTotals(sleepData, "hours");
+  const dailyExercise = dailyTotals(exerciseData, "duration");
+
+  weeklySleepChart = new Chart(el("weeklySleepChart"), {
+    type: "bar",
+    data: {
+      labels: ["4 weeks ago", "3 weeks ago", "2 weeks ago", "1 week ago"],
+      datasets: [{ label: "Total Sleep Hours", data: weeklySleep, backgroundColor: "#00ffff" }]
+    },
+    options: {
+      responsive: true,
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+
+  dailySleepChart = new Chart(el("dailySleepChart"), {
+    type: "bar",
+    data: {
+      labels: dailySleep.labels,
+      datasets: [{ label: "Daily Sleep Hours", data: dailySleep.totals, backgroundColor: "#00ffff" }]
+    },
+    options: {
+      responsive: true,
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+
+  dailyExerciseChart = new Chart(el("dailyExerciseChart"), {
+    type: "bar",
+    data: {
+      labels: dailyExercise.labels,
+      datasets: [{ label: "Daily Exercise Minutes", data: dailyExercise.totals, backgroundColor: "#7f7cff" }]
+    },
+    options: {
+      responsive: true,
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+}
+
+function checkWeeklyNotification() {
+  const allData = [...sleepData, ...exerciseData];
+  if (allData.length === 0) return;
+  const earliestDate = new Date(Math.min(...allData.map(item => new Date(item.date))));
+  const now = new Date();
+  const daysDiff = Math.floor((now - earliestDate) / (1000 * 60 * 60 * 24));
+  if (daysDiff >= 7) {
+    let notified = localStorage.getItem("weeklyNotified");
+    if (notified) return;
+    // Calculate averages over last 7 days
+    const last7Sleep = sleepData.filter(item => {
+      const itemDate = new Date(item.date);
+      return (now - itemDate) / (1000 * 60 * 60 * 24) <= 7;
+    });
+    const avgSleep = last7Sleep.length ? last7Sleep.reduce((sum, item) => sum + item.hours, 0) / last7Sleep.length : 0;
+    const last7Exercise = exerciseData.filter(item => {
+      const itemDate = new Date(item.date);
+      return (now - itemDate) / (1000 * 60 * 60 * 24) <= 7;
+    });
+    const totalExercise = last7Exercise.reduce((sum, item) => sum + item.duration, 0);
+    let advice = "";
+    if (avgSleep >= 7 && totalExercise >= 210) { // 7 hours sleep, 30 min/day *7 =210
+      advice = "🌟 Great job! Your sleep and exercise are on point. Keep up the excellent habits!";
+    } else if (avgSleep >= 7 || totalExercise >= 210) {
+      advice = "✨ You're doing well in one area! Try to balance both sleep and exercise for optimal health.";
+    } else {
+      advice = "⚠️ Your habits could use improvement. Aim for 7+ hours of sleep and 30 minutes of exercise daily.";
+    }
+    notify("📊 Weekly Check-In", advice);
+    el("adviceText").textContent = advice;
+    localStorage.setItem("weeklyNotified", "true");
+  }
+}
+
+updateCharts();
+checkWeeklyNotification();
+</script>
+
+</body>
+</html>
