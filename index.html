@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Access Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
+
+<style>
+* {
+  box-sizing: border-box;
+  font-family: 'Montserrat', sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: radial-gradient(circle at top, #1b2735, #090a0f 70%);
+  color: #e6e6e6;
+  overflow: hidden;
+  perspective: 1200px;
+}
+
+canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+.orb {
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(120,200,255,0.25), transparent 70%);
+  filter: blur(40px);
+  animation: float 18s infinite alternate ease-in-out;
+  z-index: 0;
+}
+.orb:nth-child(2) { animation-duration: 24s; left: 60%; top: 10%; }
+.orb:nth-child(3) { animation-duration: 30s; left: 20%; top: 70%; }
+
+@keyframes float {
+  from { transform: translateY(-40px) translateX(-30px); }
+  to   { transform: translateY(40px) translateX(30px); }
+}
+
+.card {
+  width: 400px;
+  max-width: 90%;
+  padding: 38px 32px;
+  background: rgba(15,20,30,0.88);
+  border-radius: 18px;
+  position: relative;
+  z-index: 2;
+  backdrop-filter: blur(18px);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.06),
+    0 40px 90px rgba(0,0,0,0.8);
+  transform-style: preserve-3d;
+  animation: breathe 6s infinite ease-in-out;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #5da9ff, #7f7cff, #5da9ff);
+  opacity: 0.35;
+  filter: blur(10px);
+  z-index: -1;
+  animation: borderFlow 6s linear infinite;
+}
+
+@keyframes borderFlow {
+  0% { filter: hue-rotate(0deg) blur(10px); }
+  50% { filter: hue-rotate(180deg) blur(15px); }
+  100% { filter: hue-rotate(360deg) blur(10px); }
+}
+
+@keyframes breathe {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+h2 {
+  text-align: center;
+  font-weight: 600;
+  letter-spacing: 1px;
+  margin-bottom: 22px;
+}
+
+input {
+  width: 100%;
+  padding: 12px;
+  margin: 8px 0;
+  border-radius: 10px;
+  border: none;
+  outline: none;
+  background: #0f1622;
+  color: #e6e6e6;
+  transition: box-shadow 0.2s ease;
+}
+input:focus {
+  box-shadow: 0 0 8px #5da9ff;
+}
+
+button {
+  cursor: pointer;
+  margin-top: 12px;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #5da9ff, #7f7cff);
+  color: #0b0f16;
+  width: 100%;
+  font-weight: 600;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(120,160,255,0.35);
+}
+
+.password-container {
+  position: relative;
+}
+.toggle-password {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin: 10px 0 16px;
+  color: #b8c1cc;
+}
+
+.link {
+  display: block;
+  margin-top: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: #9fb6ff;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.error {
+  font-size: 13px;
+  color: #ff8c8c;
+  margin-top: 12px;
+  display: none;
+  text-align: center;
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 20px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="stars"></canvas>
+<div class="orb"></div>
+<div class="orb"></div>
+<div class="orb"></div>
+
+<div class="card" id="loginPortal">
+  <h2>Access Portal</h2>
+  <form id="loginForm">
+    <label for="emailInput" class="sr-only">Email</label>
+    <input type="email" id="emailInput" name="email" placeholder="Email" required>
+    
+    <div class="password-container">
+      <label for="passwordInput" class="sr-only">Password</label>
+      <input type="password" name="password" id="passwordInput" placeholder="Password" required>
+      <span class="toggle-password" id="togglePassword" aria-label="Show/Hide password">👁️</span>
+    </div>
+    
+    <div class="remember">
+      <input type="checkbox" id="rememberMe">
+      <label for="rememberMe">Remember me</label>
+    </div>
+    
+    <button type="submit">Enter</button>
+  </form>
+  <div id="errorMessage" class="error"></div>
+</div>
+
+<script>
+/* === PASSWORD TOGGLE === */
+const togglePassword = document.getElementById("togglePassword");
+const passwordInput = document.getElementById("passwordInput");
+
+togglePassword.onclick = () => {
+  if (passwordInput.type === "password") {
+    passwordInput.type = "text";
+    togglePassword.textContent = "🙈";
+  } else {
+    passwordInput.type = "password";
+    togglePassword.textContent = "👁️";
+  }
+};
+
+/* === LOGIN DEMO WITH EMAIL VALIDATION === */
+const loginForm = document.getElementById("loginForm");
+const errorMessage = document.getElementById("errorMessage");
+const emailInput = document.getElementById("emailInput");
+const rememberMe = document.getElementById("rememberMe");
+
+// Load remembered email
+if (localStorage.getItem("rememberedEmail")) {
+  emailInput.value = localStorage.getItem("rememberedEmail");
+  rememberMe.checked = true;
+}
+
+loginForm.onsubmit = e => {
+  e.preventDefault();
+  const email = emailInput.value.trim();
+  const password = passwordInput.value.trim();
+
+  // Simple email regex
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    errorMessage.textContent = "Please enter a valid email.";
+    errorMessage.style.display = "block";
+    return;
+  }
+
+  // Deny password "gmail" (case-insensitive)
+  if (password.toLowerCase() === "gmail") {
+    errorMessage.textContent = "Password cannot be 'gmail'.";
+    errorMessage.style.display = "block";
+    return;
+  }
+
+  // Accept any email and password (except gmail)
+  if (rememberMe.checked) {
+    localStorage.setItem("rememberedEmail", email);
+  } else {
+    localStorage.removeItem("rememberedEmail");
+  }
+
+  alert("Login successful! Redirecting...");
+  window.location.href = "index1.html";
+};
+
+/* === 3D TILT === */
+const card = document.querySelector(".card");
+document.addEventListener("mousemove", e => {
+  const x = (window.innerWidth / 2 - e.clientX) / 40;
+  const y = (window.innerHeight / 2 - e.clientY) / 40;
+  card.style.transform = `rotateY(${x}deg) rotateX(${y}deg)`;
+});
+
+/* === STAR FIELD === */
+const canvas = document.getElementById("stars");
+const ctx = canvas.getContext("2d");
+let stars = [];
+
+function resize() {
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
+}
+resize();
+window.addEventListener("resize", resize);
+
+for (let i = 0; i < 150; i++) {
+  stars.push({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    r: Math.random() * 1.5,
+    s: Math.random() * 0.5 + 0.2
+  });
+}
+
+function animateStars() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = "#9fb6ff";
+  stars.forEach(s => {
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fill();
+    s.y += s.s;
+    if (s.y > canvas.height) s.y = 0;
+  });
+  requestAnimationFrame(animateStars);
+}
+animateStars();
+</script>
+
+</body>
+</html>
